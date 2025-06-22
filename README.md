@@ -31,7 +31,6 @@ streamlit run dashboard_app.py
 crypto-dashboard/
 ├── scripts/
 │ ├── fetch_crypto.py # Pulls crypto price data
-│ ├── fetch_news.py # (optional) Gets crypto-related news
 │ └── etl_pipeline.py # Cleans and processes data
 ├── dashboard_app.py # Streamlit dashboard
 ├── requirements.txt
