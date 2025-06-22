@@ -21,7 +21,6 @@ A dynamic dashboard displaying real-time cryptocurrency data using the CoinGecko
 | Dashboard UI       | Streamlit • matplotlib |
 | Deployment         | Streamlit Community Cloud* |
 
-\* Deployment link provided below once live.
 
 ## Getting Started Locally
 
@@ -49,3 +48,5 @@ crypto-dashboard/
 ├── requirements.txt
 └── README.md
 
+## Live App: 
+https://crypto-dashboard-tjneft4b3mxq7kg7usxe8d.streamlit.app/#live-crypto-dashboard
