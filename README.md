@@ -20,6 +20,7 @@ A dynamic dashboard displaying real-time cryptocurrency data using the CoinGecko
 | ETL / Data Handling| Python • pandas |
 | Dashboard UI       | Streamlit • matplotlib |
 | Deployment         | Streamlit Community Cloud* |
+
 \* Deployment link provided below once live.
 
 ## Getting Started Locally
