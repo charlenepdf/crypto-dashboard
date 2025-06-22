@@ -1,43 +1,50 @@
 # Crypto Dashboard
 
-A real-time dashboard that fetches the latest prices of top cryptocurrencies using the CoinGecko API. Built with Python, Streamlit, and Google Analytics for tracking user interaction.
+A dynamic dashboard displaying real-time cryptocurrency data using the CoinGecko API. Built with Streamlit.
 
 ## Features
 
-- Fetches live crypto price data from CoinGecko
-- Displays top 10 cryptocurrencies by market cap
-- Clean ETL pipeline with pandas
-- Streamlit dashboard with interactive UI
-- Google Analytics integration for basic user tracking
+- Currency selector (USD, EUR, SGD)
+- Coin count selector (top 5–50)
+- Manual refresh button
+- Key metrics (price, market cap, 24h volume)
+- Interactive charts (bar, pie)
+- Search filter by name/symbol
+- Timestamp for last update
 
 ## Tech Stack
 
-- Python
-- CoinGecko API
-- pandas
-- Streamlit
-- Google Analytics (via gtag.js)
+| Layer              | Tool / Library |
+|--------------------|----------------|
+| API Integration    | CoinGecko REST |
+| ETL / Data Handling| Python • pandas |
+| Dashboard UI       | Streamlit • matplotlib |
+| Deployment         | Streamlit Community Cloud* |
+\* Deployment link provided below once live.
 
-## Getting Started
+## Getting Started Locally
 
-1. Clone this repo:
+```bash
+# 1 · Clone repo
 git clone https://github.com/charlenepdf/crypto-dashboard.git
-2. Install dependencies:
+cd crypto-dashboard
+
+# 2 · Create & activate virtual env (optional but recommended)
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+
+# 3 · Install dependencies
 pip install -r requirements.txt
-3. Run the app:
+
+# 4 · Launch app
 streamlit run dashboard_app.py
+```
 
 # File Structure
 crypto-dashboard/
 ├── scripts/
-│ ├── fetch_crypto.py # Pulls crypto price data
-│ └── etl_pipeline.py # Cleans and processes data
-├── dashboard_app.py # Streamlit dashboard
+│   └── fetch_crypto.py        # Fetches and returns live crypto data
+├── dashboard_app.py           # Main Streamlit app
 ├── requirements.txt
 └── README.md
 
-## To-Do
-- [x] Setup GitHub + folder structure
-- [ ] Build `fetch_crypto.py` script
-- [ ] Add dashboard UI
-- [ ] Deploy with Streamlit Cloud
