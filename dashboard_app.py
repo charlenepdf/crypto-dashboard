@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
+import re
 from difflib import get_close_matches
 from datetime import datetime
 from scripts.fetch_crypto import fetch_top_coins
@@ -127,14 +128,20 @@ st.pyplot(fig)
 # Gemini Flash Setup for Chatbot
 import google.generativeai as genai
 
-# Load Gemini API key from environment variable
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+# Load Gemini API key from Streamlit secrets
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
 # 7) Crypto Chatbot: ask Gemini for trend insights + plot
 def extract_coin_from_prompt(prompt):
-    for word in prompt.lower().split():
+    words = re.findall(r'\w+', prompt.lower())
+    for word in words:
         if word in coin_map:
-            return coin_map[word]  # return CoinGecko ID
+            return coin_map[word]
+
+    # Fuzzy fallback
+    suggestions = get_close_matches(" ".join(words), coin_map.keys(), n=1, cutoff=0.6)
+    if suggestions:
+        return coin_map[suggestions[0]]
     return None
 
 def fetch_price_history(coin_id):
