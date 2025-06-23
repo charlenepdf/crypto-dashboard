@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import os
 from difflib import get_close_matches
 from datetime import datetime
 from scripts.fetch_crypto import fetch_top_coins
@@ -122,3 +123,48 @@ ax.pie(
 ax.axis("equal")
 st.subheader("Market Cap Distribution (Top 5 + Others)")
 st.pyplot(fig)
+
+# Gemini Flash Setup for Chatbot
+import google.generativeai as genai
+
+# Load Gemini API key from environment variable
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+# 7) Crypto Chatbot: ask Gemini for trend insights + plot
+def extract_coin_from_prompt(prompt):
+    for word in prompt.lower().split():
+        if word in coin_map:
+            return coin_map[word]  # return CoinGecko ID
+    return None
+
+def fetch_price_history(coin_id):
+    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
+    params = {"vs_currency": currency.lower(), "days": 3, "interval": "hourly"}
+    r = requests.get(url, params=params, timeout=10)
+    if r.status_code == 200:
+        data = r.json()["prices"]
+        return pd.DataFrame(data, columns=["timestamp", "price"]).assign(
+            timestamp=lambda df: pd.to_datetime(df["timestamp"], unit="ms")
+        )
+    return None
+
+st.subheader("💬 Ask CryptoBot")
+user_prompt = st.text_input("Type a question like 'Show me 3-day trend of Dogecoin'")
+
+if user_prompt:
+    with st.spinner("Thinking..."):
+        try:
+            response = genai.GenerativeModel("gemini-1.5-flash").generate_content(user_prompt)
+            st.success(response.text)
+
+            coin_id = extract_coin_from_prompt(user_prompt)
+            if coin_id:
+                df_trend = fetch_price_history(coin_id)
+                if df_trend is not None:
+                    st.line_chart(df_trend.set_index("timestamp")['price'])
+                else:
+                    st.warning("Failed to retrieve price data.")
+            else:
+                st.info("Could not detect a valid coin name in your question.")
+        except Exception as e:
+            st.error(f"Error from Gemini API: {e}")
