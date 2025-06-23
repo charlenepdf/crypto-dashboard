@@ -48,13 +48,12 @@ if df.empty:
 user_query = st.text_input("Search for a coin (name / symbol)").strip().lower()
 
 if user_query:
-    # Resolve using mapping first
-    resolved_id = coin_map.get(user_query)
+    resolved_id = extract_coin_from_prompt(user_query)  # uses fuzzy match
 
     if resolved_id:
         filtered_df = df[df["id"] == resolved_id]
     else:
-        # fallback contains‑based filter
+        # fallback: contains-based filter
         filtered_df = df[
             df["name"].str.contains(user_query, case=False) |
             df["symbol"].str.contains(user_query, case=False)
@@ -64,7 +63,7 @@ if user_query:
             if suggestions:
                 st.info("Did you mean: " + ", ".join(suggestions))
 else:
-    filtered_df = df  # no filter
+    filtered_df = df
 
 # 4) Key metrics (always based on full df => market overview)
 top_coin = df.iloc[0]
@@ -139,7 +138,7 @@ def extract_coin_from_prompt(prompt):
             return coin_map[word]
 
     # Fuzzy fallback
-    suggestions = get_close_matches(" ".join(words), coin_map.keys(), n=1, cutoff=0.6)
+    suggestions = get_close_matches(" ".join(words), list(coin_map.keys()), n=1, cutoff=0.6)
     if suggestions:
         return coin_map[suggestions[0]]
     return None
@@ -162,7 +161,7 @@ if user_prompt:
     with st.spinner("Thinking..."):
         try:
             response = genai.GenerativeModel("gemini-1.5-flash").generate_content(user_prompt)
-            st.success(response.text)
+            #st.success(response.text)
 
             coin_id = extract_coin_from_prompt(user_prompt)
             if coin_id:
