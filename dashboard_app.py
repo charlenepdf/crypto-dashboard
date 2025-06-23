@@ -132,15 +132,19 @@ genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
 # 7) Crypto Chatbot: ask Gemini for trend insights + plot
 def extract_coin_from_prompt(prompt):
-    words = re.findall(r'\w+', prompt.lower())
+    # Extract words ignoring punctuation
+    words = re.findall(r'\w+', prompt.lower())  # 'Bitcoin?' → ['bitcoin']
+    
+    # Try exact matches
     for word in words:
         if word in coin_map:
             return coin_map[word]
-
-    # Fuzzy fallback
-    suggestions = get_close_matches(" ".join(words), list(coin_map.keys()), n=1, cutoff=0.6)
+    
+    # Fuzzy match fallback
+    suggestions = get_close_matches(" ".join(words), coin_map.keys(), n=1, cutoff=0.6)
     if suggestions:
         return coin_map[suggestions[0]]
+    
     return None
 
 def fetch_price_history(coin_id):
