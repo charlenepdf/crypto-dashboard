@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import requests
 import re
+import json
 from difflib import get_close_matches
 from datetime import datetime
 from scripts.fetch_crypto import fetch_top_coins
@@ -136,7 +137,7 @@ st.pyplot(fig)
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
 # helper → extract coin id from arbitrary prompt
-def extract_coin_from_prompt(prompt:str):
+def extract_coin_from_prompt_fuzzy(prompt: str):
     words = re.findall(r"\w+", prompt.lower())
     for w in words:
         if w in coin_map:
@@ -147,15 +148,48 @@ def extract_coin_from_prompt(prompt:str):
         return coin_map[matches[0]]
     return None
 
+def extract_intent_from_prompt_llm(prompt: str):
+    system_prompt = (
+        "You are an assistant that extracts intent from user crypto questions.\n"
+        "Given a user query, respond with a JSON object like:\n"
+        "{'coin_id': '<CoinGecko ID>', 'chart': 'line' or 'bar'}\n"
+        "Return 'none' for coin_id if not found. Only respond with JSON."
+    )
+
+    model = genai.GenerativeModel("gemini-1.5-flash")
+    response = model.generate_content(f"{system_prompt}\n\nQuery: {prompt}")
+    
+    try:
+        parsed = json.loads(response.text.strip().replace("'", '"'))  # safer than eval
+        coin_id = parsed.get("coin_id")
+        chart_type = parsed.get("chart", "line")
+        return coin_id if coin_id in coin_map else None, chart_type
+    except Exception as e:
+        st.warning(f"Intent extraction failed: {e}")
+        return None, "line"
+
+
 # helper → 3‑day hourly price history
 def fetch_price_history(coin_id:str):
     url    = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
     params = {"vs_currency": currency.lower(), "days": 3, "interval": "hourly"}
     r = requests.get(url, params=params, timeout=10)
+    
+    # Debug
+    st.write("CoinGecko response:", r.status_code, r.url)
+    
     if r.status_code == 200:
         data = r.json()["prices"]
         return pd.DataFrame(data, columns=["ts", "price"]).assign(ts=lambda d: pd.to_datetime(d.ts, unit="ms"))
     return None
+
+def extract_chart_type(prompt: str):
+    prompt = prompt.lower()
+    if "bar" in prompt:
+        return "bar"
+    elif "line" in prompt:
+        return "line"
+    return "line"  # default fallback
 
 st.subheader("💬 Ask CryptoBot")
 user_prompt = st.text_input("Ask something like 'Show me 3‑day trend of Bitcoin'")
@@ -163,19 +197,26 @@ user_prompt = st.text_input("Ask something like 'Show me 3‑day trend of Bitcoi
 if user_prompt:
     with st.spinner("Thinking..."):
         try:
-            # Optional: get Gemini text answer (comment out if not needed)
+            # Optional Gemini LLM response
             # answer = genai.GenerativeModel("gemini-1.5-flash").generate_content(user_prompt)
             # st.success(answer.text)
 
-            coin_id = extract_coin_from_prompt(user_prompt)
+            # Try Gemini first, fallback to local fuzzy
+            coin_id, chart_type = extract_intent_from_prompt_llm(user_prompt)
+            st.write(f"Resolved Coin ID: {coin_id}")
+
             if coin_id:
                 trend_df = fetch_price_history(coin_id)
                 if trend_df is not None:
-                    st.line_chart(trend_df.set_index("ts")["price"])
+                    if chart_type == "bar":
+                        st.bar_chart(trend_df.set_index("ts")["price"])
+                    else:
+                        st.line_chart(trend_df.set_index("ts")["price"])
                 else:
                     st.warning("Failed to retrieve price data from CoinGecko.")
             else:
                 st.info("Could not detect a valid coin in your question.")
         except Exception as e:
             st.error(f"Gemini error: {e}")
+
 
