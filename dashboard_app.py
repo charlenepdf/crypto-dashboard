@@ -149,18 +149,27 @@ def extract_coin_from_prompt_fuzzy(prompt: str):
     return None
 
 def extract_intent_from_prompt_llm(prompt: str):
-    system_prompt = (
-        "You are an assistant that extracts intent from user crypto questions.\n"
-        "Given a user query, respond with a JSON object like:\n"
-        "{'coin_id': '<CoinGecko ID>', 'chart': 'line' or 'bar'}\n"
-        "Return 'none' for coin_id if not found. Only respond with JSON."
-    )
+    system_prompt = """
+    You are a helpful assistant that extracts coin-related info from user crypto questions.
+
+    Return ONLY a valid JSON object using this format:
+    {
+      "coin_id": "<CoinGecko ID>",
+      "chart": "line" or "bar"
+    }
+
+    - Do NOT include explanations, markdown, or other text.
+    - If coin is not recognized, return {"coin_id": "none", "chart": "line"}.
+    """
 
     model = genai.GenerativeModel("gemini-1.5-flash")
     response = model.generate_content(f"{system_prompt}\n\nQuery: {prompt}")
-    
+
+    # Debug: display raw Gemini output
+    st.write("Gemini raw response:", response.text)
+
     try:
-        parsed = json.loads(response.text.strip().replace("'", '"'))  # safer than eval
+        parsed = json.loads(response.text.strip())
         coin_id = parsed.get("coin_id")
         chart_type = parsed.get("chart", "line")
         return coin_id if coin_id in coin_map else None, chart_type
