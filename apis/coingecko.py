@@ -30,7 +30,7 @@ def fetch_price_history(coin_id, currency="usd"):
     params = {"vs_currency": currency.lower(), "days": 7}
     
     r = requests.get(url, params=params, timeout=10)
-    st.write("CoinGecko response:", r.status_code, r.url)
+    #st.write("CoinGecko response:", r.status_code, r.url) # debug
     
     if r.status_code == 200:
         data = r.json()["prices"]

@@ -160,7 +160,7 @@ def extract_intent_from_prompt_llm(prompt: str):
     response = model.generate_content(f"{system_prompt}\n\nQuery: {prompt}")
 
     raw = response.text.strip()
-    st.write("Gemini raw response:", raw)
+    #st.write("Gemini raw response:", raw) # debug
     clean = re.sub(r"```(?:json)?", "", raw).strip()
 
     try:
@@ -194,7 +194,7 @@ if user_prompt:
 
             # Try Gemini first, fallback to local fuzzy
             coin_id, chart_type = extract_intent_from_prompt_llm(user_prompt)
-            st.write(f"Resolved Coin ID: {coin_id}")
+            #st.write(f"Resolved Coin ID: {coin_id}") # debug
 
             if coin_id:
                 trend_df = fetch_price_history(coin_id, currency.lower())
