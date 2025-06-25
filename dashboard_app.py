@@ -138,7 +138,39 @@ genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
         #return coin_map[matches[0]]
     #return None
 
+
 def extract_intent_from_prompt_llm(prompt: str):
+    system_prompt = """
+    You are an assistant that extracts intent from user queries about cryptocurrencies.
+
+    Respond with a valid JSON in this format:
+    {
+      "coin_id": "<CoinGecko ID>",
+      "chart": "line" | "bar" | "pie",
+      "days": <number of days as an integer>
+    }
+
+    If 'days' is not mentioned, default to 7.
+    If coin is unknown, use "none" for coin_id.
+    """
+
+    model = genai.GenerativeModel("gemini-1.5-flash")
+    response = model.generate_content(f"{system_prompt}\n\nQuery: {prompt}")
+    raw = response.text.strip()
+    clean = re.sub(r"```(?:json)?", "", raw).strip()
+
+    try:
+        parsed = json.loads(clean)
+        coin_id = parsed.get("coin_id")
+        chart_type = parsed.get("chart", "line")
+        days = int(parsed.get("days", 7))
+        return (coin_id if coin_id in coin_map else None), chart_type, days
+    except Exception as e:
+        st.warning(f"Intent extraction failed: {e}")
+        return None, "line", 7
+
+
+#def extract_intent_from_prompt_llm(prompt: str):
     system_prompt = """
     You are an assistant that extracts coin and chart intent from user queries.
 
@@ -177,32 +209,68 @@ def extract_intent_from_prompt_llm(prompt: str):
     return "line"  # default fallback
 
 st.subheader("💬 Ask CryptoBot")
-user_prompt = st.text_input("Ask something like 'Give me a 7-day trend of Bitcoin'")
 
-if user_prompt:
-    with st.spinner("Thinking..."):
-        try:
-            # Optional Gemini LLM response
-            # answer = genai.GenerativeModel("gemini-1.5-flash").generate_content(user_prompt)
-            # st.success(answer.text)
+# Initialise chat history on first run
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-            # Try Gemini first, fallback to local fuzzy
-            coin_id, chart_type = extract_intent_from_prompt_llm(user_prompt)
-            #st.write(f"Resolved Coin ID: {coin_id}") # debug
+# Render previous messages
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        if msg["type"] == "chart":
+            # Ensure safe reloading of DataFrame
+            try:
+                df_ = pd.DataFrame(msg["df"]).set_index("ts")["price"]
+                df_.index = pd.to_datetime(df_.index)
+                
+                if msg["chart"] == "bar":
+                    st.bar_chart(df_)
+                elif msg["chart"] == "pie":
+                    fig, ax = plt.subplots()
+                    ax.pie(
+                        df_.values,
+                        labels=df_.index.strftime("%d-%b"),
+                        autopct="%1.1f%%",
+                        startangle=90,
+                        textprops={"fontsize": 8}
+                    )
+                    ax.axis("equal")
+                    st.pyplot(fig)
+                else:
+                    st.line_chart(df_)
+            except Exception as e:
+                st.warning(f"⚠️ Chart could not be rendered: {e}")
+        else:
+            st.markdown(msg["content"])
+
+# Input box (appears below history)
+if user_prompt := st.chat_input("Ask CryptoBot…"):
+    st.session_state.messages.append({
+        "role": "user", "type": "text", "content": user_prompt
+    })
+
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking…"):
+            coin_id, chart_type, days = extract_intent_from_prompt_llm(user_prompt)
 
             if coin_id:
-                trend_df = fetch_price_history(coin_id, currency.lower())
-                if trend_df is not None:
-                    # Chart title
-                    st.subheader(f"{chart_type.title()} Chart for {coin_id.capitalize()} (7 Days)")
-                    
+                trend_df = fetch_price_history(coin_id, currency.lower(), days)
+                if trend_df is not None and not trend_df.empty:
+                    # Store as dict for session serialization
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "type": "chart",
+                        "chart": chart_type,
+                        "df": trend_df.to_dict("records")  # safer than just .to_dict()
+                    })
+
                     if chart_type == "bar":
                         st.bar_chart(trend_df.set_index("ts")["price"])
                     elif chart_type == "pie":
                         fig, ax = plt.subplots()
                         ax.pie(
                             trend_df["price"],
-                            labels=trend_df["ts"].dt.strftime("%a %H:%M"),
+                            labels=trend_df["ts"].dt.strftime("%d-%b"),
                             autopct="%1.1f%%",
                             startangle=90,
                             textprops={"fontsize": 7}
@@ -212,10 +280,60 @@ if user_prompt:
                     else:
                         st.line_chart(trend_df.set_index("ts")["price"])
                 else:
-                    st.warning("Failed to retrieve price data from CoinGecko.")
+                    msg = f"⚠️ Failed to retrieve {days}-day data for **{coin_id}**."
+                    st.markdown(msg)
+                    st.session_state.messages.append({
+                        "role": "assistant", "type": "text", "content": msg
+                    })
             else:
-                st.info("Could not detect a valid coin in your question.")
-        except Exception as e:
-            st.error(f"Gemini error: {e}")
+                # fallback LLM response
+                answer = genai.GenerativeModel("gemini-1.5-flash").generate_content(user_prompt).text
+                st.markdown(answer)
+                st.session_state.messages.append({
+                    "role": "assistant", "type": "text", "content": answer
+                })
+
+
+
+#user_prompt = st.text_input("Ask something like 'Give me a 7-day trend of Bitcoin'")
+
+#if user_prompt:
+    #with st.spinner("Thinking..."):
+        #try:
+            # Optional Gemini LLM response
+            # answer = genai.GenerativeModel("gemini-1.5-flash").generate_content(user_prompt)
+            # st.success(answer.text)
+
+            # Try Gemini first, fallback to local fuzzy
+            #coin_id, chart_typ, days = extract_intent_from_prompt_llm(user_prompt)
+            #st.write(f"Resolved Coin ID: {coin_id}") # debug
+
+            #if coin_id:
+                #trend_df = fetch_price_history(coin_id, currency.lower(), days)
+                #if trend_df is not None:
+                    # Chart title
+                    #st.subheader(f"{chart_type.title()} Chart for {coin_id.capitalize()} (7 Days)")
+                    
+                    #if chart_type == "bar":
+                        #st.bar_chart(trend_df.set_index("ts")["price"])
+                    #elif chart_type == "pie":
+                        #fig, ax = plt.subplots()
+                        #ax.pie(
+                            #trend_df["price"],
+                            #labels=trend_df["ts"].dt.strftime("%a %H:%M"),
+                            #autopct="%1.1f%%",
+                            #startangle=90,
+                            #textprops={"fontsize": 7}
+                        #)
+                        #ax.axis("equal")
+                        #st.pyplot(fig)
+                    #else:
+                        #st.line_chart(trend_df.set_index("ts")["price"])
+                #else:
+                    #st.warning("Failed to retrieve price data from CoinGecko.")
+            #else:
+                #st.info("Could not detect a valid coin in your question.")
+        #except Exception as e:
+            #st.error(f"Gemini error: {e}")
 
 
