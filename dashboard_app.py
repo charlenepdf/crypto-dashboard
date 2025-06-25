@@ -183,7 +183,7 @@ def extract_intent_from_prompt_llm(prompt: str):
     return "line"  # default fallback
 
 st.subheader("💬 Ask CryptoBot")
-user_prompt = st.text_input("Ask something like 'Give me a 3-day trend of Bitcoin'")
+user_prompt = st.text_input("Ask something like 'Give me a 7-day trend of Bitcoin'")
 
 if user_prompt:
     with st.spinner("Thinking..."):

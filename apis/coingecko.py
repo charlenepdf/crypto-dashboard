@@ -27,9 +27,9 @@ def get_coin_mapping():
 # helper → 3‑day hourly price history
 def fetch_price_history(coin_id, currency="usd"):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
-    params = {"vs_currency": currency.lower(), "days": 3, "interval": "hourly"}
+    params = {"vs_currency": currency.lower(), "days": 7}
+    
     r = requests.get(url, params=params, timeout=10)
-
     st.write("CoinGecko response:", r.status_code, r.url)
     
     if r.status_code == 200:
