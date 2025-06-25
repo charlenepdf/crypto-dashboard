@@ -11,7 +11,7 @@ import google.generativeai as genai
 
 # Local modules
 from scripts.fetch_crypto import fetch_top_coins
-from apis.coingecko import get_coin_mapping, fetch_price_history
+from apis.coingecko import get_coin_mapping, fetch_price_history, search_coin_in_df
 
 
 # Page / App Config
@@ -38,21 +38,15 @@ if df.empty:
     st.stop()
 
 # 2) Table search / filter (uses contains + fuzzy suggestions)
-user_query = st.text_input("Search for a coin (name / symbol)").strip().lower()
+user_query = st.text_input("Search for a coin (name / symbol)")
 
 if user_query:
-    resolved_id = coin_map.get(user_query)
-    if resolved_id:
-        filtered_df = df[df["id"] == resolved_id]
-    else:
-        filtered_df = df[
-            df["name"].str.contains(user_query, case=False) |
-            df["symbol"].str.contains(user_query, case=False)
-        ]
-        if filtered_df.empty:
-            suggestions = get_close_matches(user_query, list(coin_map.keys()), n=3, cutoff=0.6)
-            if suggestions:
-                st.info("Did you mean: " + ", ".join(suggestions))
+    filtered_df, suggestions = search_coin_in_df(df, coin_map, user_query)
+    if filtered_df.empty:
+        if suggestions:
+            st.info("Did you mean: " + ", ".join(suggestions))
+        else:
+            st.warning("No matching coins found.")
 else:
     filtered_df = df
 

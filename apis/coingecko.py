@@ -38,3 +38,22 @@ def fetch_price_history(coin_id, currency="usd"):
             ts=lambda d: pd.to_datetime(d.ts, unit="ms")
         )
     return None
+
+def search_coin_in_df(df, coin_map, user_query):
+    user_query = user_query.strip().lower()
+    resolved_id = coin_map.get(user_query)
+
+    if resolved_id:
+        filtered = df[df["id"] == resolved_id]
+        return filtered, None
+    else:
+        filtered = df[
+            df["name"].str.contains(user_query, case=False, na=False) |
+            df["symbol"].str.contains(user_query, case=False, na=False)
+        ]
+        if not filtered.empty:
+            return filtered, None
+        else:
+            from difflib import get_close_matches
+            suggestions = get_close_matches(user_query, list(coin_map.keys()), n=3, cutoff=0.6)
+            return pd.DataFrame(), suggestions
