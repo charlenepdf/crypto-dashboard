@@ -15,9 +15,13 @@ def get_coin_mapping():
 
     mapping = {}
     for coin in coins:
-        mapping[coin["id"].lower()] = coin["id"]
-        mapping[coin["symbol"].lower()] = coin["id"]
-        mapping[coin["name"].lower()] = coin["id"]
+        coin_id = coin.get("id")
+        symbol = coin.get("symbol")
+        name = coin.get("name")
+        if coin_id and symbol and name:
+            mapping[coin_id.lower()] = coin_id
+            mapping[symbol.lower()] = coin_id
+            mapping[name.lower()] = coin_id
     return mapping
 
 # helper → 3‑day hourly price history
