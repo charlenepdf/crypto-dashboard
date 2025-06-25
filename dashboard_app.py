@@ -199,6 +199,9 @@ if user_prompt:
             if coin_id:
                 trend_df = fetch_price_history(coin_id, currency.lower())
                 if trend_df is not None:
+                    # Chart title
+                    st.subheader(f"{chart_type.title()} Chart for {coin_id.capitalize()} (7 Days)")
+                    
                     if chart_type == "bar":
                         st.bar_chart(trend_df.set_index("ts")["price"])
                     elif chart_type == "pie":
