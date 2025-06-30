@@ -274,7 +274,7 @@ if user_prompt := st.chat_input("Ask CryptoBot…"):
                 fallback = genai.GenerativeModel("gemini-1.5-flash").generate_content(user_prompt).text
                 st.markdown(fallback)
                 st.session_state.messages.append({
-                    "role": "assistant", "type": "text", "content": answer
+                    "role": "assistant", "type": "text", "content": fallback
                 })
             else:
                 trend_df = fetch_price_history(coin_id, currency.lower(), days)
