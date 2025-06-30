@@ -168,6 +168,9 @@ def extract_intent_from_prompt_llm(prompt: str):
     model = genai.GenerativeModel("gemini-1.5-flash")
     response = model.generate_content(f"{system_prompt}\n\nQuery: {prompt}")
     raw = response.text.strip()
+    
+    st.code(raw, language="json")  # Debug: Show raw Gemini response
+
     clean = re.sub(r"```(?:json)?", "", raw).strip()
 
     try:
