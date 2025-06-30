@@ -175,11 +175,12 @@ def extract_intent_from_prompt_llm(prompt: str):
 
     try:
         parsed = json.loads(clean)
-        coin_id = parsed.get("coin_id", "").strip()
+        coin = parsed.get("coin")
+        #coin_id = parsed.get("coin_id", "").strip()
         #coin_name_or_symbol = parsed.get("coin", "").strip()
         chart_type = parsed.get("chart", "line")
         days = int(parsed.get("days", 7))
-        return coin_id, chart_type, days
+        return coin, chart_type, days
         #return coin_name_or_symbol, chart_type, days
     except Exception as e:
         st.warning(f"Intent extraction failed: {e}")
@@ -267,13 +268,13 @@ if user_prompt := st.chat_input("Ask CryptoBot…"):
 
     with st.chat_message("assistant"):
         with st.spinner("Thinking…"):
-            coin_id, chart_type, days = extract_intent_from_prompt_llm(user_prompt)
-            #coin_name_or_symbol, chart_type, days = extract_intent_from_prompt_llm(user_prompt)
+            #coin_id, chart_type, days = extract_intent_from_prompt_llm(user_prompt)
+            coin_name_or_symbol, chart_type, days = extract_intent_from_prompt_llm(user_prompt)
             st.caption(f"🧠 Gemini guessed coin: {coin_id}")
             
             # Validate coin using coin_map
-            #coin_id = resolve_coin_id(coin_name_or_symbol, coin_map)
-            if not coin_id or coin_id not in coin_map.values():
+            coin_id = resolve_coin_id(coin_name_or_symbol, coin_map)
+            if not coin_id:
                 st.warning(f"⚠️ '{coin_id}' could not be resolved to a valid coin.")
                 # Fallback LLM response
                 fallback = genai.GenerativeModel("gemini-1.5-flash").generate_content(user_prompt).text
