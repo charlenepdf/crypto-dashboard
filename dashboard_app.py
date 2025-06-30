@@ -270,7 +270,7 @@ if user_prompt := st.chat_input("Ask CryptoBot…"):
         with st.spinner("Thinking…"):
             #coin_id, chart_type, days = extract_intent_from_prompt_llm(user_prompt)
             coin_name_or_symbol, chart_type, days = extract_intent_from_prompt_llm(user_prompt)
-            st.caption(f"🧠 Gemini guessed coin: {coin_id}")
+            st.caption(f"🧠 Gemini guessed coin: {coin_name_or_symbol}")
             
             # Validate coin using coin_map
             coin_id = resolve_coin_id(coin_name_or_symbol, coin_map)
