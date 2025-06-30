@@ -253,9 +253,19 @@ if user_prompt := st.chat_input("Ask CryptoBot…"):
         with st.spinner("Thinking…"):
             #coin_id, chart_type, days = extract_intent_from_prompt_llm(user_prompt)
             coin_name_or_symbol, chart_type, days = extract_intent_from_prompt_llm(user_prompt)
+            st.caption(f"🧠 Gemini guessed coin: {coin_name_or_symbol}")
+            
+            # Validate coin using coin_map
             coin_id = coin_map.get(coin_name_or_symbol.strip().lower())
-
-            if coin_id:
+            if not coin_id:
+                st.warning(f"⚠️ '{coin_name_or_symbol}' could not be resolved to a valid coin.")
+                # Fallback LLM response
+                fallback = genai.GenerativeModel("gemini-1.5-flash").generate_content(user_prompt).text
+                st.markdown(answer)
+                st.session_state.messages.append({
+                    "role": "assistant", "type": "text", "content": answer
+                })
+            else:
                 trend_df = fetch_price_history(coin_id, currency.lower(), days)
                 if trend_df is not None and not trend_df.empty:
                     # Store as dict for session serialization
@@ -263,7 +273,8 @@ if user_prompt := st.chat_input("Ask CryptoBot…"):
                         "role": "assistant",
                         "type": "chart",
                         "chart": chart_type,
-                        "df": trend_df.to_dict("records")  # safer than just .to_dict()
+                        "df": trend_df.to_dict("records"),  # safer than just .to_dict()
+                        "coin_id": coin_id
                     })
 
                     if chart_type == "bar":
@@ -287,13 +298,13 @@ if user_prompt := st.chat_input("Ask CryptoBot…"):
                     st.session_state.messages.append({
                         "role": "assistant", "type": "text", "content": msg
                     })
-            else:
-                # fallback LLM response
-                answer = genai.GenerativeModel("gemini-1.5-flash").generate_content(user_prompt).text
-                st.markdown(answer)
-                st.session_state.messages.append({
-                    "role": "assistant", "type": "text", "content": answer
-                })
+            # else:
+            #     # fallback LLM response
+            #     answer = genai.GenerativeModel("gemini-1.5-flash").generate_content(user_prompt).text
+            #     st.markdown(answer)
+            #     st.session_state.messages.append({
+            #         "role": "assistant", "type": "text", "content": answer
+            #     })
 
 
 
