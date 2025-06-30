@@ -6,23 +6,47 @@ import streamlit as st
 
 # Build & cache FULL CoinGecko mapping  (id / symbol / name → id)
 @st.cache_data(show_spinner=False)
+
 def get_coin_mapping():
     url = "https://api.coingecko.com/api/v3/coins/list"
-    try:
-        coins = requests.get(url, timeout=15).json()
-    except Exception:
-        return {}
+    response = requests.get(url)
 
-    mapping = {}
-    for coin in coins:
-        coin_id = coin.get("id")
-        symbol = coin.get("symbol")
-        name = coin.get("name")
-        if coin_id and symbol and name:
-            mapping[coin_id.lower()] = coin_id
-            mapping[symbol.lower()] = coin_id
-            mapping[name.lower()] = coin_id
-    return mapping
+    if response.status_code != 200:
+        raise ValueError("Failed to fetch coin list from CoinGecko")
+
+    data = response.json()  # This should be a list of dicts like {'id': 'bitcoin', 'symbol': 'btc', 'name': 'Bitcoin'}
+
+    # Create a mapping from name and symbol → CoinGecko ID
+    coin_map = {}
+    for coin in data:
+        if isinstance(coin, dict):  # ✅ Make sure it's a dictionary
+            coin_id = coin.get("id")
+            name = coin.get("name", "").lower()
+            symbol = coin.get("symbol", "").lower()
+            if coin_id and name:
+                coin_map[name] = coin_id
+            if coin_id and symbol:
+                coin_map[symbol] = coin_id
+    return coin_map
+
+
+# def get_coin_mapping():
+#     url = "https://api.coingecko.com/api/v3/coins/list"
+#     try:
+#         coins = requests.get(url, timeout=15).json()
+#     except Exception:
+#         return {}
+
+#     mapping = {}
+#     for coin in coins:
+#         coin_id = coin.get("id")
+#         symbol = coin.get("symbol")
+#         name = coin.get("name")
+#         if coin_id and symbol and name:
+#             mapping[coin_id.lower()] = coin_id
+#             mapping[symbol.lower()] = coin_id
+#             mapping[name.lower()] = coin_id
+#     return mapping
 
 # helper → 3‑day hourly price history
 def fetch_price_history(coin_id, currency="usd", days=7):
