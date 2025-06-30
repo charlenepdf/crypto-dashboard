@@ -172,10 +172,12 @@ def extract_intent_from_prompt_llm(prompt: str):
 
     try:
         parsed = json.loads(clean)
-        coin_id = parsed.get("coin_id")
+        #coin_id = parsed.get("coin_id")
+        coin_name_or_symbol = parsed.get("coin", "").strip()
         chart_type = parsed.get("chart", "line")
         days = int(parsed.get("days", 7))
-        return (coin_id if coin_id in coin_map else None), chart_type, days
+        #return (coin_id if coin_id in coin_map else None), chart_type, days
+        return coin_name_or_symbol, chart_type, days
     except Exception as e:
         st.warning(f"Intent extraction failed: {e}")
         return None, "line", 7
