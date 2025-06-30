@@ -16,6 +16,8 @@ from apis.coingecko import get_coin_mapping, fetch_price_history, search_coin_in
 # Helper to resolve coin name/symbol to valid CoinGecko ID
 def resolve_coin_id(name_or_symbol: str, coin_map: dict):
     """Resolves user coin input to valid CoinGecko ID using exact or fuzzy match."""
+    if not name_or_symbol: 
+        return None
     name_or_symbol = name_or_symbol.strip().lower()
     if name_or_symbol in coin_map:
         return coin_map[name_or_symbol]
@@ -175,6 +177,7 @@ def extract_intent_from_prompt_llm(prompt: str):
 
     try:
         parsed = json.loads(clean)
+        st.write("Raw Gemini parsed:", parsed) # Debug
         coin = parsed.get("coin")
         #coin_id = parsed.get("coin_id", "").strip()
         #coin_name_or_symbol = parsed.get("coin", "").strip()
