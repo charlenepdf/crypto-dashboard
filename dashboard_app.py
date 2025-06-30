@@ -273,7 +273,7 @@ if user_prompt := st.chat_input("Ask CryptoBot…"):
             
             # Validate coin using coin_map
             #coin_id = resolve_coin_id(coin_name_or_symbol, coin_map)
-            if not coin_id or coin_id.lower() not in coin_map.values():
+            if not coin_id or coin_id not in coin_map.values():
                 st.warning(f"⚠️ '{coin_id}' could not be resolved to a valid coin.")
                 # Fallback LLM response
                 fallback = genai.GenerativeModel("gemini-1.5-flash").generate_content(user_prompt).text
