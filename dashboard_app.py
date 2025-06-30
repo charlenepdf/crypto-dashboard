@@ -13,6 +13,17 @@ import google.generativeai as genai
 from scripts.fetch_crypto import fetch_top_coins
 from apis.coingecko import get_coin_mapping, fetch_price_history, search_coin_in_df
 
+# Helper to resolve coin name/symbol to valid CoinGecko ID
+def resolve_coin_id(name_or_symbol: str, coin_map: dict):
+    """Resolves user coin input to valid CoinGecko ID using exact or fuzzy match."""
+    name_or_symbol = name_or_symbol.strip().lower()
+    if name_or_symbol in coin_map:
+        return coin_map[name_or_symbol]
+    else:
+        matches = get_close_matches(name_or_symbol, list(coin_map.keys()), n=1, cutoff=0.6)
+        if matches:
+            return coin_map[matches[0]]
+    return None
 
 # Page / App Config
 
@@ -256,12 +267,12 @@ if user_prompt := st.chat_input("Ask CryptoBot…"):
             st.caption(f"🧠 Gemini guessed coin: {coin_name_or_symbol}")
             
             # Validate coin using coin_map
-            coin_id = coin_map.get(coin_name_or_symbol.strip().lower())
+            coin_id = resolve_coin_id(coin_name_or_symbol, coin_map)
             if not coin_id:
                 st.warning(f"⚠️ '{coin_name_or_symbol}' could not be resolved to a valid coin.")
                 # Fallback LLM response
                 fallback = genai.GenerativeModel("gemini-1.5-flash").generate_content(user_prompt).text
-                st.markdown(answer)
+                st.markdown(fallback)
                 st.session_state.messages.append({
                     "role": "assistant", "type": "text", "content": answer
                 })
