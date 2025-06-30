@@ -145,13 +145,13 @@ def extract_intent_from_prompt_llm(prompt: str):
 
     Respond with a valid JSON in this format:
     {
-      "coin_id": "<CoinGecko ID>",
+      "coin_id": "<coin name or symbol>",
       "chart": "line" | "bar" | "pie",
       "days": <number of days as an integer>
     }
 
     If 'days' is not mentioned, default to 7.
-    If coin is unknown, use "none" for coin_id.
+    If coin is unknown, use "none" for coin.
     """
 
     model = genai.GenerativeModel("gemini-1.5-flash")
@@ -251,7 +251,9 @@ if user_prompt := st.chat_input("Ask CryptoBot…"):
 
     with st.chat_message("assistant"):
         with st.spinner("Thinking…"):
-            coin_id, chart_type, days = extract_intent_from_prompt_llm(user_prompt)
+            #coin_id, chart_type, days = extract_intent_from_prompt_llm(user_prompt)
+            coin_name_or_symbol, chart_type, days = extract_intent_from_prompt_llm(user_prompt)
+            coin_id = coin_map.get(coin_name_or_symbol.strip().lower())
 
             if coin_id:
                 trend_df = fetch_price_history(coin_id, currency.lower(), days)
