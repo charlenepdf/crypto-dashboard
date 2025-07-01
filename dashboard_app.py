@@ -271,13 +271,14 @@ if user_prompt := st.chat_input("Ask CryptoBot…"):
     with st.chat_message("assistant"):
         with st.spinner("Thinking…"):
             #coin_id, chart_type, days = extract_intent_from_prompt_llm(user_prompt)
-            coin_name_or_symbol, chart_type, days = extract_intent_from_prompt_llm(user_prompt)
-            st.caption(f"🧠 Gemini guessed coin: {coin_name_or_symbol}")
+            #coin_name_or_symbol, chart_type, days = extract_intent_from_prompt_llm(user_prompt)
+            coin_input, chart_type, days = extract_intent_from_prompt_llm(user_prompt)
+            st.caption(f"🧠 Gemini guessed coin: {coin_input}")
             
             # Validate coin using coin_map
-            coin_id = resolve_coin_id(coin_name_or_symbol, coin_map)
+            coin_id = resolve_coin_id(coin_input, coin_map)
             if not coin_id:
-                st.warning(f"⚠️ '{coin_id}' could not be resolved to a valid coin.")
+                st.warning(f"⚠️ Could not resolve '{coin_input}' to a valid coin.")
                 # Fallback LLM response
                 fallback = genai.GenerativeModel("gemini-1.5-flash").generate_content(user_prompt).text
                 st.markdown(fallback)
