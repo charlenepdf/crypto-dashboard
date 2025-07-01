@@ -21,14 +21,12 @@ def resolve_coin_id(name_or_symbol: str, coin_map: dict):
     name_or_symbol = name_or_symbol.strip().lower()
     if name_or_symbol in coin_map:
         return coin_map[name_or_symbol]
-    else:
-        matches = get_close_matches(name_or_symbol, list(coin_map.keys()), n=1, cutoff=0.6)
-        if matches:
-            return coin_map[matches[0]]
+    matches = get_close_matches(name_or_symbol, list(coin_map.keys()), n=1, cutoff=0.6)
+    if matches:
+        return coin_map[matches[0]]
     return None
 
 # Page / App Config
-
 st.set_page_config(page_title="Crypto Dashboard", layout="wide")
 st.title("Live Crypto Dashboard")
 st.markdown("Displays top cryptocurrencies by market cap using CoinGecko API.")
@@ -178,7 +176,8 @@ def extract_intent_from_prompt_llm(prompt: str):
     try:
         parsed = json.loads(clean)
         st.write("Raw Gemini parsed:", parsed) # Debug
-        coin = parsed.get("coin")
+        coin = parsed.get("coin_id")
+        #coin = parsed.get("coin")
         #coin_id = parsed.get("coin_id", "").strip()
         #coin_name_or_symbol = parsed.get("coin", "").strip()
         chart_type = parsed.get("chart", "line")
