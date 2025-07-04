@@ -6,6 +6,8 @@ import re
 import json
 from difflib import get_close_matches
 from datetime import datetime
+from dotenv import load_dotenv
+import os
 
 import google.generativeai as genai
 
@@ -17,12 +19,15 @@ from apis.coingecko import get_coin_mapping, fetch_price_history, search_coin_in
 def resolve_coin_id(name_or_symbol: str, coin_map: dict):
     """Resolves user coin input to valid CoinGecko ID using exact or fuzzy match."""
     if not name_or_symbol: 
+        print('Did not find a mapping in the coin map')
         return None
     name_or_symbol = name_or_symbol.strip().lower()
     if name_or_symbol in coin_map:
+        print('Found a mapping in the coin map')
         return coin_map[name_or_symbol]
     matches = get_close_matches(name_or_symbol, list(coin_map.keys()), n=1, cutoff=0.8)
     if matches:
+        st.write(f"Fuzzy match for '{name_or_symbol}':", matches[0])
         return coin_map[matches[0]]
     return None
 
@@ -121,7 +126,11 @@ st.pyplot(fig)
 
 # 7) Gemini Chatbot (trend + chart)
 
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+# For production
+# genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+
+# For local
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 # helper → extract coin id from arbitrary prompt
 #def extract_coin_from_prompt_fuzzy(prompt: str):
@@ -276,6 +285,7 @@ if user_prompt := st.chat_input("Ask CryptoBot…"):
                 st.write("Days:", days)
 
                 trend_df = fetch_price_history(coin_id, currency.lower(), days)
+                print("trend_df:", trend_df)
                 if trend_df is not None and not trend_df.empty:
                     # Store as dict for session serialization
                     st.session_state.messages.append({
