@@ -21,7 +21,7 @@ def resolve_coin_id(name_or_symbol: str, coin_map: dict):
     name_or_symbol = name_or_symbol.strip().lower()
     if name_or_symbol in coin_map:
         return coin_map[name_or_symbol]
-    matches = get_close_matches(name_or_symbol, list(coin_map.keys()), n=1, cutoff=0.6)
+    matches = get_close_matches(name_or_symbol, list(coin_map.keys()), n=1, cutoff=0.8)
     if matches:
         return coin_map[matches[0]]
     return None
@@ -61,20 +61,6 @@ if user_query:
 else:
     filtered_df = df
 
-# 3) Key metrics (based on full df)
-
-#top_coin = df.iloc[0]
-#st.subheader(f"📊 Key Metrics for Top Coin: {top_coin['name']}")
-#col1, col2, col3 = st.columns(3)
-
-#with col1:
-    #st.metric("Price",      f"${top_coin['current_price']:,.2f}", f"{top_coin['price_change_percentage_24h']:.2f}%")
-#with col2:
-    #st.metric("Market Cap", f"${top_coin['market_cap']:,.0f}")
-#with col3:
-    #st.metric("24h Volume", f"${top_coin['total_volume']:,.0f}")
-
-#st.caption(f"⏱ Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 if not df.empty:
     top_coin = df.iloc[0]
@@ -270,8 +256,6 @@ if user_prompt := st.chat_input("Ask CryptoBot…"):
 
     with st.chat_message("assistant"):
         with st.spinner("Thinking…"):
-            #coin_id, chart_type, days = extract_intent_from_prompt_llm(user_prompt)
-            #coin_name_or_symbol, chart_type, days = extract_intent_from_prompt_llm(user_prompt)
             coin_input, chart_type, days = extract_intent_from_prompt_llm(user_prompt)
             st.caption(f"🧠 Gemini guessed coin: {coin_input}")
             
@@ -286,6 +270,11 @@ if user_prompt := st.chat_input("Ask CryptoBot…"):
                     "role": "assistant", "type": "text", "content": fallback
                 })
             else:
+                st.write(f"Resolved coin input: {coin_input}")
+                st.write(f"Final resolved coin ID: {coin_id}")
+                st.write("Chart type:", chart_type)
+                st.write("Days:", days)
+
                 trend_df = fetch_price_history(coin_id, currency.lower(), days)
                 if trend_df is not None and not trend_df.empty:
                     # Store as dict for session serialization
