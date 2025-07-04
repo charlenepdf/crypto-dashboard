@@ -92,7 +92,7 @@ def fetch_price_history(coin_id, currency="usd", days=7):
     print("Inside fetch_price_history, currency:", currency)
     print("Inside fetch_price_history, days:", days)
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
-    params = {"vs_currency": currency.lower(), "days": days, "interval": "hourly" if days <= 90 else "daily"}
+    params = {"vs_currency": currency.lower(), "days": days, "interval": "daily"}
     
     r = requests.get(url, params=params, timeout=10)
     #st.write("CoinGecko response:", r.status_code, r.url) # debug
