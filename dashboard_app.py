@@ -126,10 +126,10 @@ st.pyplot(fig)
 # 7) Gemini Chatbot (trend + chart)
 
 # For production
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+#genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
 # For local
-# genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 # Gemini Prompt
 def extract_intent_from_prompt_llm(prompt: str):
@@ -150,7 +150,19 @@ def extract_intent_from_prompt_llm(prompt: str):
     """
 
     model = genai.GenerativeModel("gemini-1.5-flash")
-    response = model.generate_content(f"{system_prompt}\n\nQuery: {prompt}")
+    
+    # Handle exceptions
+    try:
+        response = model.generate_content(f"{system_prompt}\n\nQuery: {prompt}")
+    except Exception as e:
+        st.error("⚠️ Gemini API error: Resource exhausted or quota exceeded.")
+        st.session_state.messages.append({
+            "role": "assistant", "type": "text", "content": "I'm currently unable to respond due to resource limits. Please try again later."
+        })
+        return "info", prompt, None, None  # fallback
+
+    #response = model.generate_content(f"{system_prompt}\n\nQuery: {prompt}")
+    
     raw = response.text.strip()
 
     #st.code(raw, language="json")  # Debug Gemini's response
@@ -217,16 +229,19 @@ if user_prompt:
                     })
 
         elif intent_type == "info":
-            info_response = genai.GenerativeModel("gemini-1.5-flash").generate_content(user_prompt).text
+            try:
+                info_response = genai.GenerativeModel("gemini-1.5-flash").generate_content(user_prompt).text
+            except Exception as e:
+                st.error("⚠️ Gemini API error: Resource exhausted or quota exceeded.")
+                info_response = "I'm currently unable to respond due to resource limits. Please try again later."
+
+            st.markdown(info_response)
             st.session_state.messages.append({
-                "role": "assistant", "type": "text", "content": info_response
+                "role": "assistant",
+                "type": "text",
+                "content": info_response
             })
 
-        else:
-            fallback = "⚠️ I couldn't understand your request. Try asking about a crypto trend or general info."
-            st.session_state.messages.append({
-                "role": "assistant", "type": "text", "content": fallback
-            })
 
     # Trim to last 30 messages
     if len(st.session_state.messages) > 30:
