@@ -14,21 +14,64 @@ import google.generativeai as genai
 from scripts.fetch_crypto import fetch_top_coins
 from apis.coingecko import get_coin_mapping, fetch_price_history, search_coin_in_df
 
-# Helper to resolve coin name/symbol to valid CoinGecko ID
-def resolve_coin_id(name_or_symbol: str, coin_map: dict):
-    """Resolves user coin input to valid CoinGecko ID using exact or fuzzy match."""
-    if not name_or_symbol: 
-        print('Did not find a mapping in the coin map')
+def resolve_coin_id(name_or_symbol: str, name_map: dict, id_map: dict, symbol_map: dict):
+    """Resolves a coin input to the most likely CoinGecko ID using name, ID, or symbol."""
+
+    if not name_or_symbol:
+        print("❌ Empty input.")
         return None
-    name_or_symbol = name_or_symbol.strip().lower()
-    if name_or_symbol in coin_map:
-        print('Found a mapping in the coin map')
-        return coin_map[name_or_symbol]
-    matches = get_close_matches(name_or_symbol, list(coin_map.keys()), n=1, cutoff=0.8)
-    if matches:
-        st.write(f"Fuzzy match for '{name_or_symbol}':", matches[0])
-        return coin_map[matches[0]]
+
+    query = name_or_symbol.strip().lower()
+    print(f"Resolving: {query}")
+
+    # 1. Exact match in name map
+    if query in name_map:
+        print("✅ Found in name_map")
+        return name_map[query]
+
+    # 2. Exact match in ID map (already valid CoinGecko ID)
+    if query in id_map:
+        print("✅ Found in id_map")
+        return id_map[query]
+
+    # 3. Symbol match (may return multiple IDs)
+    if query in symbol_map:
+        candidates = symbol_map[query]
+        if len(candidates) == 1:
+            print("✅ Found one match in symbol_map:", candidates[0])
+            return candidates[0]
+        else:
+            # Optional: Rank or filter — here, just pick first for simplicity
+            print(f"⚠️ Multiple matches for symbol '{query}': {candidates}")
+            return candidates[0]  # You could add logic here to prefer e.g., 'binancecoin'
+
+    # 4. Fuzzy match across all names
+    all_names = list(name_map.keys())
+    fuzzy_matches = get_close_matches(query, all_names, n=1, cutoff=0.8)
+    if fuzzy_matches:
+        match = fuzzy_matches[0]
+        print(f"🔍 Fuzzy matched '{query}' to '{match}'")
+        return name_map[match]
+
+    print("❌ No match found.")
     return None
+
+
+# Helper to resolve coin name/symbol to valid CoinGecko ID
+# def resolve_coin_id(name_or_symbol: str, coin_map: dict):
+#     """Resolves user coin input to valid CoinGecko ID using exact or fuzzy match."""
+#     if not name_or_symbol: 
+#         print('Did not find a mapping in the coin map')
+#         return None
+#     name_or_symbol = name_or_symbol.strip().lower()
+#     if name_or_symbol in coin_map:
+#         print('Found a mapping in the coin map')
+#         return coin_map[name_or_symbol]
+#     matches = get_close_matches(name_or_symbol, list(coin_map.keys()), n=1, cutoff=0.8)
+#     if matches:
+#         st.write(f"Fuzzy match for '{name_or_symbol}':", matches[0])
+#         return coin_map[matches[0]]
+#     return None
 
 # Page / App Config
 st.set_page_config(page_title="Crypto Dashboard", layout="wide")
@@ -36,7 +79,9 @@ st.title("Live Crypto Dashboard")
 st.markdown("Displays top cryptocurrencies by market cap using CoinGecko API.")
 
 # Get coin mapping (cached in coingecko.py)
-coin_map = get_coin_mapping()
+#coin_map = get_coin_mapping()
+name_map, id_map, symbol_map = get_coin_mapping()
+
 
 # 1) Sidebar controls + top‑N dataframe
 
@@ -131,6 +176,9 @@ st.pyplot(fig)
 # For local
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
+# Cache Gemini model instance
+gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+
 # Gemini Prompt
 def extract_intent_from_prompt_llm(prompt: str):
     system_prompt = """
@@ -148,12 +196,10 @@ def extract_intent_from_prompt_llm(prompt: str):
 
     If 'days' is not mentioned, default to 7. If coin is unknown, use "none" for coin.
     """
-
-    model = genai.GenerativeModel("gemini-1.5-flash")
     
     # Handle exceptions
     try:
-        response = model.generate_content(f"{system_prompt}\n\nQuery: {prompt}")
+        response = gemini_model.generate_content(f"{system_prompt}\n\nQuery: {prompt}")
     except Exception as e:
         st.error("⚠️ Gemini API error: Resource exhausted or quota exceeded.")
         st.session_state.messages.append({
@@ -161,7 +207,7 @@ def extract_intent_from_prompt_llm(prompt: str):
         })
         return "info", prompt, None, None  # fallback
 
-    #response = model.generate_content(f"{system_prompt}\n\nQuery: {prompt}")
+    #response = gemini_model.generate_content(f"{system_prompt}\n\nQuery: {prompt}")
     
     raw = response.text.strip()
 
@@ -193,7 +239,7 @@ if "messages" not in st.session_state:
 
 # Handle user input and generate response
 user_prompt = st.chat_input("Ask CryptoBot…")
-if user_prompt:
+if user_prompt and user_prompt.strip(): # Ignores empty or whitespace-only input
     # Add user's message to history
     st.session_state.messages.append({
         "role": "user", "type": "text", "content": user_prompt
@@ -205,12 +251,14 @@ if user_prompt:
 
         if intent_type == "chart":
             coin_input, chart_type, days = value1, value2, value3
-            coin_id = resolve_coin_id(coin_input, coin_map)
+            #coin_id = resolve_coin_id(coin_input, coin_map)
+            coin_id = resolve_coin_id(coin_input, name_map, id_map, symbol_map)
 
             if not coin_id:
-                fallback = genai.GenerativeModel("gemini-1.5-flash").generate_content(user_prompt).text
+                msg = f"⚠️ I couldn't resolve '{coin_input}' to a valid coin. Try using the full name or correct symbol."
+                #fallback = gemini_model.generate_content(user_prompt).text
                 st.session_state.messages.append({
-                    "role": "assistant", "type": "text", "content": fallback
+                    "role": "assistant", "type": "text", "content": msg
                 })
             else:
                 trend_df = fetch_price_history(coin_id, currency.lower(), days)
@@ -230,19 +278,16 @@ if user_prompt:
 
         elif intent_type == "info":
             try:
-                info_response = genai.GenerativeModel("gemini-1.5-flash").generate_content(user_prompt).text
+                info_response = gemini_model.generate_content(user_prompt).text
             except Exception as e:
                 st.error("⚠️ Gemini API error: Resource exhausted or quota exceeded.")
                 info_response = "I'm currently unable to respond due to resource limits. Please try again later."
 
-            st.markdown(info_response)
             st.session_state.messages.append({
                 "role": "assistant",
                 "type": "text",
                 "content": info_response
             })
-
-
     # Trim to last 30 messages
     if len(st.session_state.messages) > 30:
         st.session_state.messages = st.session_state.messages[-30:]
@@ -256,10 +301,14 @@ for msg in st.session_state.messages:
             try:
                 df_ = pd.DataFrame(msg["df"]).set_index("ts")["price"]
                 df_.index = pd.to_datetime(df_.index)
+                coin = msg.get("coin_id", "").upper()
+                chart_type = msg["chart"]
+                currency_label = currency.upper()
 
-                if msg["chart"] == "bar":
+                if chart_type == "bar":
+                    st.markdown(f"**{coin.title()} Price Trend ({currency_label})**")
                     st.bar_chart(df_)
-                elif msg["chart"] == "pie":
+                elif chart_type == "pie":
                     fig, ax = plt.subplots()
                     ax.pie(
                         df_.values,
@@ -271,6 +320,15 @@ for msg in st.session_state.messages:
                     ax.axis("equal")
                     st.pyplot(fig)
                 else:
-                    st.line_chart(df_)
+                    #st.line_chart(df_)
+                    fig, ax = plt.subplots()
+                    ax.plot(df_.index, df_.values, marker="o")
+                    ax.set_title(f"{coin.title()} Price Trend ({currency_label})")
+                    ax.set_ylabel(f"Price ({currency_label})")
+                    ax.set_xlabel("Date")
+                    ax.tick_params(axis="x", rotation=45)
+                    ax.grid(True, linestyle="--", alpha=0.5)
+                    st.pyplot(fig)
+
             except Exception as e:
                 st.warning(f"⚠️ Chart could not be rendered: {e}")

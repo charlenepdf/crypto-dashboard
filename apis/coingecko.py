@@ -7,6 +7,41 @@ import streamlit as st
 # Build & cache FULL CoinGecko mapping  (id / symbol / name → id)
 @st.cache_data(show_spinner=False)
 
+def get_coin_mapping():
+    url = "https://api.coingecko.com/api/v3/coins/list"
+    response = requests.get(url)
+    if response.status_code != 200:
+        raise ValueError("Failed to fetch coin list from CoinGecko")
+
+    data = response.json()
+
+    # Structure: {lowercase name or id: coin_id}
+    name_map = {}
+    id_map = {}
+    symbol_map = {}
+
+    for coin in data:
+        coin_id = coin.get("id")
+        name = coin.get("name", "").strip().lower()
+        symbol = coin.get("symbol", "").strip().lower()
+
+        if name:
+            name_map[name] = coin_id
+        if coin_id:
+            id_map[coin_id] = coin_id
+        if symbol and symbol not in symbol_map:
+            symbol_map[symbol] = []
+        if symbol:
+            symbol_map[symbol].append(coin_id)
+    
+    print("DEBUG: name_map['bitcoin'] =", name_map.get("bitcoin"))
+    print("DEBUG: id_map['binancecoin'] =", id_map.get("binancecoin"))
+    print("DEBUG: symbol_map['bnb'] =", symbol_map.get("bnb"))
+
+    return name_map, id_map, symbol_map
+
+
+
 # def get_coin_mapping():
 #     url = "https://api.coingecko.com/api/v3/coins/list"
 #     response = requests.get(url)
@@ -14,77 +49,32 @@ import streamlit as st
 #     if response.status_code != 200:
 #         raise ValueError("Failed to fetch coin list from CoinGecko")
 
-#     data = response.json()  # This should be a list of dicts like {'id': 'bitcoin', 'symbol': 'btc', 'name': 'Bitcoin'}
+#     data = response.json()
 
-#     # Create a mapping from name and symbol → CoinGecko ID
+#     # Map from symbol and name → id, but only keep first match to avoid conflicts
 #     coin_map = {}
+#     seen_keys = set()
+
 #     for coin in data:
-#         if isinstance(coin, dict):  # ✅ Make sure it's a dictionary
+#         if isinstance(coin, dict):
 #             coin_id = coin.get("id")
-#             name = coin.get("name", "").lower()
-#             symbol = coin.get("symbol", "").lower()
-#             if coin_id and name:
+#             name = coin.get("name", "").strip().lower()
+#             symbol = coin.get("symbol", "").strip().lower()
+
+#             # Only map if key hasn't been used yet (avoid overwriting)
+#             if name and name not in seen_keys:
 #                 coin_map[name] = coin_id
-#             if coin_id and symbol:
+#                 seen_keys.add(name)
+#             if symbol and symbol not in seen_keys:
 #                 coin_map[symbol] = coin_id
-                
-#     print("DEBUG: coin_map['bitcoin'] =", coin_map.get("bitcoin"))
-#     print("DEBUG: coin_map['btc'] =", coin_map.get("btc"))
-#     print(coin_map)
-    
+#                 seen_keys.add(symbol)
+
+#     # Debug samples
+#     print("DEBUG: coin_map['bitcoin'] =", coin_map.get("bitcoin"))  # name
+#     print("DEBUG: coin_map['btc'] =", coin_map.get("btc"))          # symbol
+
 #     return coin_map
 
-def get_coin_mapping():
-    url = "https://api.coingecko.com/api/v3/coins/list"
-    response = requests.get(url)
-
-    if response.status_code != 200:
-        raise ValueError("Failed to fetch coin list from CoinGecko")
-
-    data = response.json()
-
-    # Map from symbol and name → id, but only keep first match to avoid conflicts
-    coin_map = {}
-    seen_keys = set()
-
-    for coin in data:
-        if isinstance(coin, dict):
-            coin_id = coin.get("id")
-            name = coin.get("name", "").strip().lower()
-            symbol = coin.get("symbol", "").strip().lower()
-
-            # Only map if key hasn't been used yet (avoid overwriting)
-            if name and name not in seen_keys:
-                coin_map[name] = coin_id
-                seen_keys.add(name)
-            if symbol and symbol not in seen_keys:
-                coin_map[symbol] = coin_id
-                seen_keys.add(symbol)
-
-    # Debug samples
-    print("DEBUG: coin_map['bitcoin'] =", coin_map.get("bitcoin"))  # name
-    print("DEBUG: coin_map['btc'] =", coin_map.get("btc"))          # symbol
-
-    return coin_map
-
-
-# def get_coin_mapping():
-#     url = "https://api.coingecko.com/api/v3/coins/list"
-#     try:
-#         coins = requests.get(url, timeout=15).json()
-#     except Exception:
-#         return {}
-
-#     mapping = {}
-#     for coin in coins:
-#         coin_id = coin.get("id")
-#         symbol = coin.get("symbol")
-#         name = coin.get("name")
-#         if coin_id and symbol and name:
-#             mapping[coin_id.lower()] = coin_id
-#             mapping[symbol.lower()] = coin_id
-#             mapping[name.lower()] = coin_id
-#     return mapping
 
 # helper → 3‑day hourly price history
 def fetch_price_history(coin_id, currency="usd", days=7):
