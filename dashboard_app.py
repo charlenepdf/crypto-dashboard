@@ -21,7 +21,14 @@ def resolve_coin_id(name_or_symbol: str, name_map: dict, id_map: dict, symbol_ma
         print("❌ Empty input.")
         return None
 
+    if not isinstance(name_or_symbol, str):
+        print("❌ Invalid input: expected a string.")
+        return None
     query = name_or_symbol.strip().lower()
+    
+    if query == "none":
+        return None
+
     print(f"Resolving: {query}")
 
     # 1. Exact match in name map
@@ -187,9 +194,11 @@ def extract_intent_from_prompt_llm(prompt: str):
     Respond with a valid JSON object like:
     {
       "type": "chart" | "info",
-      "coin_id": "<coin name or symbol>",       // Only for chart
+      "coin_id": ["<coin name or symbol>", ...],       // Only for chart
       "chart": "line" | "bar" | "pie",          // Only for chart
-      "days": <number of days as an integer>    // Only for chart
+      "days": <number of days as an integer>,    // Only for chart
+      "metric": "price" | "volume",
+      "scope": "trend" | "current"
     }
 
     If it's a general information request (like 'what is bitcoin?'), set "type" to "info" and ignore other fields.
@@ -219,13 +228,26 @@ def extract_intent_from_prompt_llm(prompt: str):
         parsed = json.loads(clean)
         #st.write("Parsed Gemini JSON:", parsed)
 
+        # if parsed.get("type") == "chart":
+        #     coin = parsed.get("coin_id")
+        #     chart_type = parsed.get("chart", "line")
+        #     days = int(parsed.get("days", 7))
+        #     metric = parsed.get("metric", "price")
+        #     scope = parsed.get("scope", "trend")
+        #     return "chart", coin, chart_type, days, metric, scope
+        
         if parsed.get("type") == "chart":
-            coin = parsed.get("coin_id")
+            coin = parsed.get("coin_id", [])
+            if isinstance(coin, str):
+                coin = [coin]
             chart_type = parsed.get("chart", "line")
             days = int(parsed.get("days", 7))
-            return "chart", coin, chart_type, days
+            metric = parsed.get("metric", "price")
+            scope = parsed.get("scope", "trend")
+            return "chart", coin, chart_type, days, metric, scope
+
         else:
-            return "info", prompt, None, None
+            return "info", prompt, None, None, None, None
     except Exception as e:
         st.warning(f"Intent extraction failed: {e}")
         return "info", prompt, None, None
@@ -247,35 +269,47 @@ if user_prompt and user_prompt.strip(): # Ignores empty or whitespace-only input
 
     # Process input and update history (but don't display yet)
     with st.spinner("Thinking…"):
-        intent_type, value1, value2, value3 = extract_intent_from_prompt_llm(user_prompt)
+        #intent_type, value1, value2, value3 = extract_intent_from_prompt_llm(user_prompt)
+        intent_type, coin_input, chart_type, days, metric, scope = extract_intent_from_prompt_llm(user_prompt)
+        chart_type = chart_type or "line"
+        metric = metric or "price"
+        scope = scope or "trend"
 
         if intent_type == "chart":
-            coin_input, chart_type, days = value1, value2, value3
+            #coin_input, chart_type, days = value1, value2, value3
             #coin_id = resolve_coin_id(coin_input, coin_map)
-            coin_id = resolve_coin_id(coin_input, name_map, id_map, symbol_map)
+            #coin_id = resolve_coin_id(coin_input, name_map, id_map, symbol_map)
+            if isinstance(coin_input, str):
+                coin_input = [coin_input]
 
-            if not coin_id:
-                msg = f"⚠️ I couldn't resolve '{coin_input}' to a valid coin. Try using the full name or correct symbol."
-                #fallback = gemini_model.generate_content(user_prompt).text
+            resolved_ids = []
+            for coin in coin_input:
+                if coin == "none":
+                    continue
+                resolved = resolve_coin_id(coin, name_map, id_map, symbol_map)
+                if resolved:
+                    resolved_ids.append(resolved)
+            if not resolved_ids:
+                msg = f"⚠️ I couldn't resolve any of these coins: {', '.join(coin_input)}"
                 st.session_state.messages.append({
                     "role": "assistant", "type": "text", "content": msg
                 })
             else:
-                trend_df = fetch_price_history(coin_id, currency.lower(), days)
-                if trend_df is not None and not trend_df.empty:
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "type": "chart",
-                        "chart": chart_type,
-                        "df": trend_df.to_dict("records"),
-                        "coin_id": coin_id
-                    })
+                if scope == "trend":
+                    trend_df = fetch_price_history(resolved_ids[0], currency.lower(), days)
                 else:
-                    msg = f"⚠️ Failed to retrieve {days}-day data for **{coin_id}**."
-                    st.session_state.messages.append({
-                        "role": "assistant", "type": "text", "content": msg
-                    })
+                    trend_df = None
 
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "type": "chart",
+                    "chart": chart_type,
+                    "df": trend_df.to_dict("records") if trend_df is not None else [],
+                    "coin_id": resolved_ids,
+                    "metric": metric,
+                    "scope": scope
+                })        
+                    
         elif intent_type == "info":
             try:
                 info_response = gemini_model.generate_content(user_prompt).text
@@ -299,31 +333,68 @@ for msg in st.session_state.messages:
             st.markdown(msg["content"])
         elif msg["type"] == "chart":
             try:
-                df_ = pd.DataFrame(msg["df"]).set_index("ts")["price"]
-                df_.index = pd.to_datetime(df_.index)
-                coin = msg.get("coin_id", "").upper()
-                chart_type = msg["chart"]
+                coin_ids = msg.get("coin_id", [])
+                chart_type = msg.get("chart", "line")
                 currency_label = currency.upper()
+                metric = msg.get("metric", "price")
+                scope = msg.get("scope", "trend")
 
+                # Normalize to list
+                if isinstance(coin_ids, str):
+                    coin_ids = [coin_ids]
                 if chart_type == "bar":
-                    st.markdown(f"**{coin.title()} Price Trend ({currency_label})**")
-                    st.bar_chart(df_)
+                    if scope == "current" and metric == "price":
+                        # Bar chart comparing prices of multiple coins
+                        df_filtered = df[df["id"].isin(coin_ids)]
+                        if not df_filtered.empty:
+                            st.markdown(f"**Current Prices ({currency_label})**")
+                            st.bar_chart(df_filtered.set_index("name")["current_price"])
+                        else:
+                            st.warning("No matching coins found for bar chart.")
+                    elif scope == "trend":
+                        # Bar chart of single coin's trend
+                        df_ = pd.DataFrame(msg["df"]).set_index("ts")["price"]
+                        df_.index = pd.to_datetime(df_.index)
+                        st.markdown(f"**{coin_ids[0].title()} Price Trend ({currency_label})**")
+                        st.bar_chart(df_)
+                
                 elif chart_type == "pie":
-                    fig, ax = plt.subplots()
-                    ax.pie(
-                        df_.values,
-                        labels=df_.index.strftime("%d-%b"),
-                        autopct="%1.1f%%",
-                        startangle=90,
-                        textprops={"fontsize": 8}
-                    )
-                    ax.axis("equal")
-                    st.pyplot(fig)
+                    if scope == "current" and metric == "volume":
+                        # Pie chart of volume share
+                        df_filtered = df[df["id"].isin(coin_ids)]
+                        fig, ax = plt.subplots()
+                        ax.pie(
+                            df_filtered["total_volume"],
+                            labels=df_filtered["name"],
+                            autopct="%1.1f%%",
+                            startangle=90,
+                            textprops={"fontsize": 8}
+                        )
+                        ax.axis("equal")
+                        st.markdown("**Trading Volume Share**")
+                        st.pyplot(fig)
+                    else:
+                        # Single coin: pie chart of daily prices
+                        df_ = pd.DataFrame(msg["df"]).set_index("ts")["price"]
+                        df_.index = pd.to_datetime(df_.index)
+                        fig, ax = plt.subplots()
+                        ax.pie(
+                            df_.values,
+                            labels=df_.index.strftime("%d-%b"),
+                            autopct="%1.1f%%",
+                            startangle=90,
+                            textprops={"fontsize": 8}
+                        )
+                        ax.axis("equal")
+                        st.markdown(f"**{coin_ids[0].title()} Price Distribution ({currency_label})**")
+                        st.pyplot(fig)
+                        
                 else:
-                    #st.line_chart(df_)
+                    df_ = pd.DataFrame(msg["df"]).set_index("ts")["price"]
+                    df_.index = pd.to_datetime(df_.index)
                     fig, ax = plt.subplots()
                     ax.plot(df_.index, df_.values, marker="o")
-                    ax.set_title(f"{coin.title()} Price Trend ({currency_label})")
+                    ax.set_title(f"{coin_ids[0].title()} Price Trend ({currency_label})")
                     ax.set_ylabel(f"Price ({currency_label})")
                     ax.set_xlabel("Date")
                     ax.tick_params(axis="x", rotation=45)
@@ -332,3 +403,44 @@ for msg in st.session_state.messages:
 
             except Exception as e:
                 st.warning(f"⚠️ Chart could not be rendered: {e}")
+
+# Render all messages from history
+# for msg in st.session_state.messages:
+#     with st.chat_message(msg["role"]):
+#         if msg["type"] == "text":
+#             st.markdown(msg["content"])
+#         elif msg["type"] == "chart":
+#             try:
+#                 df_ = pd.DataFrame(msg["df"]).set_index("ts")["price"]
+#                 df_.index = pd.to_datetime(df_.index)
+#                 coin = msg.get("coin_id", "").upper()
+#                 chart_type = msg["chart"]
+#                 currency_label = currency.upper()
+
+#                 if chart_type == "bar":
+#                     st.markdown(f"**{coin.title()} Price Trend ({currency_label})**")
+#                     st.bar_chart(df_)
+#                 elif chart_type == "pie":
+#                     fig, ax = plt.subplots()
+#                     ax.pie(
+#                         df_.values,
+#                         labels=df_.index.strftime("%d-%b"),
+#                         autopct="%1.1f%%",
+#                         startangle=90,
+#                         textprops={"fontsize": 8}
+#                     )
+#                     ax.axis("equal")
+#                     st.pyplot(fig)
+#                 else:
+#                     #st.line_chart(df_)
+#                     fig, ax = plt.subplots()
+#                     ax.plot(df_.index, df_.values, marker="o")
+#                     ax.set_title(f"{coin.title()} Price Trend ({currency_label})")
+#                     ax.set_ylabel(f"Price ({currency_label})")
+#                     ax.set_xlabel("Date")
+#                     ax.tick_params(axis="x", rotation=45)
+#                     ax.grid(True, linestyle="--", alpha=0.5)
+#                     st.pyplot(fig)
+
+#             except Exception as e:
+#                 st.warning(f"⚠️ Chart could not be rendered: {e}")
