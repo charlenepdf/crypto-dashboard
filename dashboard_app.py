@@ -250,7 +250,7 @@ def extract_intent_from_prompt_llm(prompt: str):
             return "info", prompt, None, None, None, None
     except Exception as e:
         st.warning(f"Intent extraction failed: {e}")
-        return "info", prompt, None, None
+        return "info", prompt, None, None, None, None
 
 
 st.subheader("💬 Ask CryptoBot")
